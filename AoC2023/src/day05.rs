@@ -12,7 +12,7 @@ fn parse_seeds(section: &str) -> Result<Seeds, ParseIntError> {
 }
 
 // TODO: explore
-//      this could be optimized using a once computed lookup array
+//      this could mabye be optimized using a once computed lookup array
 struct MapEntry {
     dest_range_start: u64,
     src_range_start: u64,
@@ -24,7 +24,7 @@ impl MapEntry {
     }
     fn map(&self, src: u64) -> Option<u64> {
         if self.contains_src(src) {
-            Some(src + self.range_len)
+            Some(self.dest_range_start + (src - self.src_range_start))
         } else {
             None
         }
@@ -96,7 +96,7 @@ pub fn main() {
     let emptyline_re = regex::Regex::new(r"(?m)^\n").unwrap();
     let mut sections = emptyline_re.split(INPUT);
 
-    let seeds = parse_seeds(sections.next().unwrap());
+    let seeds = parse_seeds(sections.next().unwrap()).unwrap();
     let seed_to_soil = Map::parse_section(sections.next().unwrap());
     let soil_to_fertilizer = Map::parse_section(sections.next().unwrap());
     let fertilizer_to_water = Map::parse_section(sections.next().unwrap());
@@ -104,4 +104,23 @@ pub fn main() {
     let light_to_temp = Map::parse_section(sections.next().unwrap());
     let temp_to_humid = Map::parse_section(sections.next().unwrap());
     let humid_to_location = Map::parse_section(sections.next().unwrap());
+
+    let reducer_chain = [
+        seed_to_soil,
+        soil_to_fertilizer,
+        fertilizer_to_water,
+        water_to_light,
+        light_to_temp,
+        temp_to_humid,
+        humid_to_location,
+    ];
+
+    let reducer = |seed: &u64| {
+        reducer_chain
+            .iter()
+            .fold(*seed, |acc, curr_map| curr_map.map(acc))
+    };
+
+    let smallest_location = seeds.iter().map(reducer).min().unwrap();
+    println!("closest location for seed {smallest_location}");
 }
