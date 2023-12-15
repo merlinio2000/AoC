@@ -1,8 +1,8 @@
 build:
     cargo build
 
-run *REST:
-    cargo run {{REST}}
+run package *REST:
+    cargo run -p {{package}} {{REST}}
 
-test *REST:
-    cargo test {{REST}}
+test package *REST:
+    cargo test -p {{package}} {{REST}}

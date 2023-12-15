@@ -1,13 +1,11 @@
-[package]
-name = "AoC2023"
-version = "0.1.0"
-edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[profile.release]
-debug = true
+[workspace]
+resolver = "2"
+members = ["day*"]
 
-[dependencies]
+[workspace.dependencies]
 itertools = "0.12.0"
 rayon = "1.8.0"
 regex = "1.10.2"
+
+
