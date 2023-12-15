@@ -1,6 +1,8 @@
 build:
     cargo build
 
-run:
-    cargo run 
+run *REST:
+    cargo run {{REST}}
 
+test *REST:
+    cargo test {{REST}}
