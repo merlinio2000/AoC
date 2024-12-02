@@ -34,17 +34,27 @@ fn part1(sorted1: &[Num], sorted2: &[Num]) {
     println!("total distance is {distance}");
 }
 
-fn part2(sorted1: &[Num], sorted2: &[Num]) {
-    let mut iter2 = sorted2.iter().peekable();
-    let mut skip_values_lower_than = |to: Num| iter2.by_ref().skip_while(|id2| **id2 < to);
-    let mut count_repetitions_of = |val: Num| iter2.peeking_take_while(|id2| **id2 == val).count();
+fn part2(sorted1: &[Num], mut sorted2: &[Num]) {
+    fn skip_values_lower_than(to: Num, slice: &[Num]) -> &[u32] {
+        &slice[slice.iter().position(|id| *id >= to).unwrap_or(slice.len())..]
+    }
+    fn count_repetitions_of(val: Num, slice: &[u32]) -> usize {
+        slice.iter().take_while(|id| **id == val).count()
+    }
+    sorted2 = skip_values_lower_than(sorted1[0], sorted2);
+    let mut last_id_and_count = (sorted1[0], count_repetitions_of(sorted1[0], sorted2));
     let similarity: usize = sorted1
         .iter()
         .map(|id1| {
-            skip_values_lower_than(*id1);
-            *id1 as usize * count_repetitions_of(*id1)
+            if *id1 != last_id_and_count.0 {
+                sorted2 = skip_values_lower_than(*id1, sorted2);
+                last_id_and_count = (*id1, count_repetitions_of(*id1, sorted2));
+            }
+            last_id_and_count.0 as usize * last_id_and_count.1
         })
         .sum();
+
+    println!("total similarity score is {similarity}");
 }
 
 fn main() {
@@ -54,4 +64,5 @@ fn main() {
     let (sorted1, sorted2) = (list1, list2);
 
     part1(&sorted1, &sorted2);
+    part2(&sorted1, &sorted2);
 }
