@@ -1,4 +1,4 @@
-use std::str::Lines;
+use std::{fmt::Display, str::Lines};
 
 use anyhow::{anyhow, Context, Result};
 use itertools::Itertools;
@@ -57,12 +57,37 @@ impl Iterator for PathIter {
 
 /// since its only 3 letters it can A-Z can be optimized
 /// 26^3 possibilities fit into a u16, see [Location::try_from]
+/// Goal destinations (**Z) additinoally have their MSB set to one
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Location(u16);
 
 impl Location {
+    const Z_FLAG: u16 = 1 << 15;
+    /// ends with 'Z'
     fn is_goal(&self) -> bool {
-        self.0 == 26u16.pow(3) - 1
+        self.0 & Self::Z_FLAG != 0
+    }
+
+    /// ends with 'A'
+    fn is_start(&self) -> bool {
+        self.0 / 26u16.pow(2) == 0
+    }
+
+    fn as_chars(&self) -> [char; 3] {
+        let mut val = self.0 & !Self::Z_FLAG;
+        let first = val % 26;
+        val -= first;
+        let second = (val % 26u16.pow(2)) / 26;
+        val -= val % 26u16.pow(2);
+        let third = val / 26u16.pow(2);
+
+        [first, second, third].map(|u: u16| char::from_u32((u + b'A' as u16).into()).unwrap())
+    }
+}
+
+impl Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_chars().into_iter().join(""))
     }
 }
 
@@ -73,9 +98,14 @@ impl TryFrom<&str> for Location {
         if value.len() == 3 && value.chars().all(|c| c.is_ascii_uppercase()) {
             let bytes = value.as_bytes();
             let mut res = 0u16;
-            res += (bytes[0] - b'A') as u16; // * 26^0
+            res += (bytes[0] - b'A') as u16;
             res += ((bytes[1] - b'A') as u16) * 26u16; // ^1
             res += ((bytes[2] - b'A') as u16) * 26u16.pow(2);
+
+            if bytes[2] == b'Z' {
+                res |= Self::Z_FLAG;
+            }
+
             Ok(Self(res))
         } else {
             Err(anyhow!("invalid location {value}"))
@@ -89,10 +119,10 @@ struct Crossing {
     right: Location,
 }
 impl Crossing {
-    fn go(&self, dir: Direction) -> &Location {
+    fn go(&self, dir: Direction) -> Location {
         match dir {
-            Direction::Left => &self.left,
-            Direction::Right => &self.right,
+            Direction::Left => self.left,
+            Direction::Right => self.right,
         }
     }
 }
@@ -105,17 +135,24 @@ impl Crossings {
         Self(v)
     }
 
-    fn start(&self) -> Option<&Location> {
-        self.0.first().map(|c| &c.src)
+    fn starts(&self) -> Vec<Location> {
+        self.0
+            .iter()
+            .filter_map(|c| c.src.is_start().then(|| c.src))
+            .collect()
     }
 
-    fn go(&self, from: &Location, dir: Direction) -> Result<&Location> {
+    fn go(&self, from: Location, dir: Direction) -> Result<Location> {
         let crossing_idx = self
             .0
-            .binary_search_by_key(from, |c| c.src)
+            .binary_search_by_key(&from, |c| c.src)
             .map_err(|_| anyhow!("unable to find {from:?} in the crossings"))?;
 
         Ok(self.0[crossing_idx].go(dir))
+    }
+
+    fn paths_to_goals(&self, from) {
+        
     }
 }
 
@@ -146,22 +183,35 @@ pub fn main() -> Result<()> {
     let path = lines.next().context("missing first input line")?;
     let path = parse_path(path)?;
 
-    debug_assert_eq!(lines.next(), Some(""));
+    assert_eq!(lines.next(), Some(""));
 
     let crossings = parse_crossings(lines)?;
 
-    let mut curr_loc = crossings.start().context("crossings have no start")?;
-    assert_eq!(curr_loc.0, 0);
+    let mut curr_locs = crossings.starts();
 
-    let steps = path
+    debug_assert!(curr_locs.iter().all(|l| !l.is_goal()));
+
+    let mut all_finished = true;
+    let count = path
         .into_iter()
         .take_while_inclusive(|dir| {
-            curr_loc = crossings.go(curr_loc, *dir).unwrap();
-            !curr_loc.is_goal()
+            // println!(
+            //     "{}",
+            //     curr_locs
+            //         .iter()
+            //         .map(|l| l.as_chars().iter().join(""))
+            //         .join(", ")
+            // );
+            all_finished = true;
+            for curr_loc in &mut curr_locs {
+                *curr_loc = crossings.go(*curr_loc, *dir).unwrap();
+                all_finished &= curr_loc.is_goal();
+            }
+            !all_finished
         })
         .count();
 
-    println!("steps: {steps}");
+    println!("steps: {count}");
 
     Ok(())
 }
