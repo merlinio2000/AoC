@@ -1,8 +1,7 @@
-[package]
-name = "AoC2024"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "3"
+members = ["day*"]
 
-[dependencies]
+[workspace.dependencies]
 itertools = "0.13.0"
 nom = "7.1.3"
