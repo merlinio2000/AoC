@@ -8,7 +8,7 @@ use nom::{
 };
 use std::str::FromStr;
 
-const INPUT: &str = include_str!("week1.input").trim_ascii_end();
+const INPUT: &str = include_str!("input.txt").trim_ascii_end();
 type Num = u32;
 
 fn decimal_number(input: &str) -> IResult<&str, Num> {
