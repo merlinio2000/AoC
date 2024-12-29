@@ -6,7 +6,10 @@ use nom::{
     combinator::map_res,
     multi::separated_list1,
 };
-use std::str::FromStr;
+use std::{
+    cmp::{Ordering, min},
+    str::FromStr,
+};
 
 const INPUT: &str = include_str!("input.txt").trim_ascii_end();
 type Num = i32;
@@ -51,7 +54,150 @@ fn part1(lists: &[Vec<Num>]) -> usize {
         .filter(|list| list_is_monotonic_and_no_repetitions(list))
         .count();
 
-    println!("total safe count is {safe_count}");
+    println!("PART1: total safe count is {safe_count}");
+    safe_count
+}
+
+fn part2_simple(list: &[Num]) -> bool {
+    if list_is_monotonic_and_no_repetitions(list) {
+        return true;
+    }
+    let cleaned_len = list.len() - 1;
+    let mut cleaned_vec = vec![0; cleaned_len];
+    for index_to_remove in 0..list.len() {
+        for (index, value) in list.iter().enumerate() {
+            match index.cmp(&index_to_remove) {
+                Ordering::Greater => cleaned_vec[index - 1] = *value,
+                Ordering::Equal => { /* ignore this element */ }
+                Ordering::Less => cleaned_vec[index] = *value,
+            }
+        }
+        if list_is_monotonic_and_no_repetitions(cleaned_vec.as_slice()) {
+            return true;
+        }
+    }
+    false
+}
+
+fn compare_solutions(list: &[Num]) -> bool {
+    let probably_correct = part2_simple(list);
+    let trying_to_be_smart = list_is_monotonic_and_no_repetitions_with_one_removal(list);
+    if probably_correct == trying_to_be_smart {
+        trying_to_be_smart
+    } else {
+        println!(
+            "INPUT: {list:?}
+mismatch between the simple={probably_correct} and fancy={trying_to_be_smart} result"
+        );
+        probably_correct
+    }
+}
+
+fn list_is_monotonic_and_no_repetitions_with_one_removal(list: &[Num]) -> bool {
+    debug_assert!(list.len() > 3);
+
+    let differences = list
+        .iter()
+        .tuple_windows()
+        .map(|(left, right)| left - right)
+        .collect_vec();
+    // TODO: is this beeing auto-vectorized? could be fun to manually do
+    let (num_neg, num_0, num_pos) = (
+        differences.iter().filter(|diff| **diff < 0).count(),
+        differences.iter().filter(|diff| **diff == 0).count(),
+        differences.iter().filter(|diff| **diff > 0).count(),
+    );
+    if num_0 > 1 || min(num_neg, num_pos) > 1 {
+        return false;
+    }
+
+    match num_neg.cmp(&num_pos) {
+        Ordering::Less => {
+            // input: [8, 4, 2, 1]
+            // diffs: [4, 2, 1]
+            // -------------------
+            // input: [4, 8, 2, 1]
+            // diffs: [-4, 6, 1]
+            // -------------------
+            // input: [4, 2, 8, 1]
+            // diffs: [2, -6, 7]
+            // -------------------
+            // input: [4, 2, 1, 8]
+            // diffs: [2, 1, -7]
+            // println!(
+            //     "DESC -
+            //     input: {list:?}
+            //     diffs: {differences:?}",
+            // );
+            let expected_range = 1..=3;
+            let mut carry = 0;
+            let mut had_error = false;
+            for diff in differences {
+                // println!("diff={diff}, carry={carry}");
+                if !expected_range.contains(&(diff - carry)) {
+                    carry = diff;
+                    if had_error {
+                        return false;
+                    } else {
+                        had_error = true;
+                    }
+                } else {
+                    carry = 0;
+                }
+            }
+            true
+        }
+        Ordering::Greater => {
+            // input: [8, 1, 2, 4]
+            // diffs: [7, -1, -2]
+            // -------------------
+            // input: [1, 8, 2, 4]
+            // diffs: [-7, 6, -2]
+            // -------------------
+            // input: [1, 2, 8, 4]
+            // diffs: [-1, -6, 4]
+            // -------------------
+            // input: [1, 2, 4, 8]
+            // diffs: [-1, -2, -4]
+            // -------------------
+            // input: [1, 2, 8, 9]
+            // diffs: [-1, -6, -1]
+            // -------------------
+            // TODO: this is currently wrong
+            // input: [87, 86, 87, 86, 83]
+            // diffs: [1, -1, 1, 3]
+
+            // println!(
+            //     "ASC -
+            //     input: {list:?}
+            //     diffs: {differences:?}",
+            // );
+            let expected_range = -3..=-1;
+            let mut carry = 0;
+            let mut had_error = false;
+            for diff in differences {
+                // println!("diff={diff}, carry={carry}");
+                if !expected_range.contains(&(diff + carry)) {
+                    carry = diff;
+                    if had_error {
+                        return false;
+                    } else {
+                        had_error = true;
+                    }
+                } else {
+                    carry = 0;
+                }
+            }
+            true
+        }
+        Ordering::Equal => panic!("this should not be possible"),
+    }
+}
+
+fn part2(lists: &[Vec<Num>]) -> usize {
+    let safe_count = lists.iter().filter(|list| compare_solutions(list)).count();
+
+    println!("PART2: total safe count is {safe_count}");
     safe_count
 }
 
@@ -59,11 +205,15 @@ fn main() {
     let lists = parse(INPUT);
 
     part1(&lists);
+    part2(&lists);
 }
 
 #[cfg(test)]
 mod test {
-    use crate::list_is_monotonic_and_no_repetitions;
+    use crate::{
+        list_is_monotonic_and_no_repetitions,
+        list_is_monotonic_and_no_repetitions_with_one_removal, part2,
+    };
 
     use super::{parse, part1};
 
@@ -77,7 +227,7 @@ mod test {
 ";
 
     #[test]
-    fn example() {
+    fn example1() {
         let lists = parse(INPUT);
         itertools::assert_equal(
             [true, false, false, false, false, true],
@@ -87,5 +237,18 @@ mod test {
         );
         let got = part1(&lists);
         assert_eq!(got, 2);
+    }
+
+    #[test]
+    fn example2() {
+        let lists = parse(INPUT);
+        itertools::assert_equal(
+            [true, false, false, true, true, true],
+            lists
+                .iter()
+                .map(|list| list_is_monotonic_and_no_repetitions_with_one_removal(list)),
+        );
+        let got = part2(&lists);
+        assert_eq!(got, 4);
     }
 }
