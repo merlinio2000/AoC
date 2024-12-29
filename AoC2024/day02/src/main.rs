@@ -124,6 +124,10 @@ fn list_is_monotonic_and_no_repetitions_with_one_removal(list: &[Num]) -> bool {
             // -------------------
             // input: [4, 2, 1, 8]
             // diffs: [2, 1, -7]
+            // -------------------
+            // input: [87, 86, 87, 86, 83]
+            // diffs: [1, -1, 1, 3]
+
             // println!(
             //     "DESC -
             //     input: {list:?}
@@ -134,7 +138,14 @@ fn list_is_monotonic_and_no_repetitions_with_one_removal(list: &[Num]) -> bool {
             let mut had_error = false;
             for diff in differences {
                 // println!("diff={diff}, carry={carry}");
-                if !expected_range.contains(&(diff - carry)) {
+                if diff < 0 {
+                    carry = -diff;
+                    if had_error {
+                        return false;
+                    } else {
+                        had_error = true;
+                    }
+                } else if !expected_range.contains(&(diff - carry)) {
                     carry = diff;
                     if had_error {
                         return false;
@@ -163,9 +174,14 @@ fn list_is_monotonic_and_no_repetitions_with_one_removal(list: &[Num]) -> bool {
             // input: [1, 2, 8, 9]
             // diffs: [-1, -6, -1]
             // -------------------
-            // TODO: this is currently wrong
-            // input: [87, 86, 87, 86, 83]
-            // diffs: [1, -1, 1, 3]
+            // INPUT: [78, 81, 83, 84, 83, 84]
+            // diffs: [-3, -2, -1, 1, -1]
+
+            // Buggy - we dont correctly handle mismatches in the first
+            // value (there should be no carry then since there is no gap to be
+            // bridged)
+            // INPUT: [7, 4, 6, 7, 8, 10, 13, 15]
+            // diffs: [3, -2, -1, -1, -2, -3, -2]
 
             // println!(
             //     "ASC -
